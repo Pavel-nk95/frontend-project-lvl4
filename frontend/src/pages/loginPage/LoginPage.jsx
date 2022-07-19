@@ -1,6 +1,6 @@
 import axios from 'axios';
-import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   MDBContainer,
   MDBCard,
@@ -17,23 +17,50 @@ import './LoginPage.css';
 import key from './assets/key.png';
 import * as Yup from 'yup';
 import cn from 'classnames';
+import routes from '../../routes.js';
+
+import { useAuth } from '../../hooks/index.js';
 
 const LoginSchema = Yup.object({
-  name: Yup.string().required(),
+  username: Yup.string().required(),
   password: Yup.string().required(),
 });
 
 function LoginPage() {
+  const auth = useAuth();
   const [authFailed, setAuthFailed] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const formik = useFormik({
     initialValues: {
-      name: '',
+      username: '',
       password: '',
     },
     validationSchema: LoginSchema,
-    onSubmit: (values) => {
-      console.log(JSON.stringify(values, null, 2));
+    onSubmit: async (values) => {
+      setAuthFailed(false);
+
+      try {
+        const res = await axios.post(routes.loginPath(), values);
+        auth.logIn(res.data);
+        const { from } = location.state || {
+          from: { pathname: routes.chatPagePath() },
+        };
+        navigate(from);
+      } catch (err) {
+        console.error(err);
+        if (!err.isAxiosError) {
+          console.log('Неизвестная ошибка');
+          return;
+        }
+
+        if (err.response?.status === 401) {
+          setAuthFailed(true);
+        } else {
+          console.log('Ошибка сети');
+        }
+      }
     },
   });
 
@@ -63,14 +90,13 @@ function LoginPage() {
                       <MDBInput
                         className={inputFieldClass}
                         type="text"
-                        id="name"
+                        id="username"
                         label="Ваш ник"
                         size="lg"
-                        name="name"
+                        name="username"
                         onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                        value={formik.values.name}
-                        autoComplete="name"
+                        value={formik.values.username}
+                        autoComplete="username"
                       />
                       <MDBInput
                         className={inputFieldClass}
@@ -80,18 +106,17 @@ function LoginPage() {
                         size="lg"
                         name="password"
                         onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
                         value={formik.values.password}
                         autoComplete="password"
                       />
-                      {authFailed ? (
+                      {authFailed && (
                         <div
                           className="invalid-feedback"
                           style={{ display: 'block' }}
                         >
                           Неверные имя пользователя или пароль
                         </div>
-                      ) : null}
+                      )}
                       <MDBBtn size="lg" type="submit" className="mt-4" block>
                         Войти
                       </MDBBtn>
@@ -100,7 +125,8 @@ function LoginPage() {
                 </MDBRow>
               </MDBCardBody>
               <MDBCardFooter className="text-center">
-                Нет аккаунта? <Link to="/signup">Зарегестрируйтесь</Link>
+                Нет аккаунта?{' '}
+                <Link to={routes.signupPagePath()}>Зарегестрируйтесь</Link>
               </MDBCardFooter>
             </MDBCard>
           </MDBCol>
